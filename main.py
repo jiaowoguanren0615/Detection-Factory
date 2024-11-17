@@ -1,10 +1,13 @@
+"""
+This script has not yet been completed now, do not run
+"""
 import argparse
 import datetime
 import os
-import pprint
+import numpy as np
 import re
 import time
-
+import logging
 
 import torch
 from torch.utils import data
@@ -15,8 +18,8 @@ from util.collate_fn import collate_fn
 from util.engine import evaluate, train_one_epoch
 from util.group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
 from util.lazy_load import Config
-from util.misc import default_setup, encode_labels, fixed_generator, seed_worker
-from util.distributed_utils import HighestCheckpoint, load_checkpoint, load_state_dict
+from util.misc import encode_labels, fixed_generator, seed_worker
+from util.distributed_utils import load_checkpoint, load_state_dict, init_distributed_mode, get_rank
 
 
 def parse_args():
@@ -56,7 +59,18 @@ def parse_args():
 
 def train():
     args = parse_args()
+    print(args)
+    init_distributed_mode(args)
+
+    seed = args.seed + get_rank()
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    # random.seed(seed)
+
+    torch.backends.cudnn.benchmark = True
+
     cfg = Config(args.config_file, partials=("lr_scheduler", "optimizer", "param_dicts"))
+    logger = logging.getLogger(os.path.basename(os.getcwd()) + "." + __name__)
 
     # modify output directory
     if getattr(cfg, "output_dir", None) is None:
@@ -84,8 +98,6 @@ def train():
             )
 
 
-
-
     # instantiate dataset
     params = dict(num_workers=cfg.num_workers, collate_fn=collate_fn)
     params.update(dict(pin_memory=cfg.pin_memory, persistent_workers=True))
@@ -105,9 +117,7 @@ def train():
 
     # instantiate model, optimizer and lr_scheduler
     model = Config(cfg.model_path).model
-    if accelerator.use_distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    # optimizer = cfg.optimizer(cfg.param_dicts(model))
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=1e-4, betas=(0.9, 0.999))
     lr_scheduler = cfg.lr_scheduler(optimizer)
 
@@ -123,37 +133,21 @@ def train():
     classes = tuple(cfg.train_dataset.coco.cats.get(c, {"name": "none"})["name"] for c in cat_ids)
     model.register_buffer("_classes_", torch.tensor(encode_labels(classes)))
 
-    # prepare for distributed training
-    model, optimizer, train_loader, test_loader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_loader, test_loader, lr_scheduler
-    )
+    # TODO prepare for distributed training
+
 
     # load from a directory, which means resume training
     if weight_path is not None and os.path.isdir(weight_path):
-        accelerator.load_state(cfg.resume_from_checkpoint)
         path = os.path.basename(cfg.resume_from_checkpoint)
         cfg.starting_epoch = int(path.split("_")[-1]) + 1
-        accelerator.project_configuration.iteration = cfg.starting_epoch
         logger.info(f"resume training of {cfg.output_dir}, from {path}")
     else:
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         logger.info("model parameters: {}".format(n_params))
-        logger.info("optimizer: {}".format(optimizer))
-        logger.info("lr_scheduler: {}".format(pprint.pformat(lr_scheduler.state_dict())))
 
-    # save dataset name, useful for inference
-    if accelerator.is_main_process:
-        label_file = os.path.join(cfg.output_dir, "label_names.txt")
-        with open(label_file, "w") as f:
-            caid_name = [f"{k} {v['name']}" for k, v in cfg.train_dataset.coco.cats.items()]
-            caid_name = "\n".join(caid_name)
-            f.write(caid_name)
-        logger.info(f"Label names is saved to {label_file}")
 
     loss_scalar = NativeScaler()
-    logger.info("Start training")
     start_time = time.perf_counter()
-    highest_checkpoint = HighestCheckpoint(accelerator, model)
     for epoch in range(cfg.starting_epoch, cfg.num_epochs):
         train_one_epoch(
             model=model,
@@ -168,20 +162,14 @@ def train():
             loss_scaler=loss_scalar
         )
 
-        # we save model and labels together
-        accelerator.save_state(safe_serialization=False)
-        logger.info("Start evaluation")
-        coco_info = evaluate(model, test_loader, epoch)
-        print(coco_info)
+        coco_evaluator = evaluate(model, test_loader, epoch)
 
         # save best results
-        # cur_ap, cur_ap50 = coco_evaluator.coco_eval["bbox"].stats[:2]
-        # highest_checkpoint.update(ap=cur_ap, ap50=cur_ap50)
+        cur_ap, cur_ap50 = coco_evaluator.coco_eval["bbox"].stats[:2]
 
     total_time = time.perf_counter() - start_time
     total_time = str(datetime.timedelta(seconds=int(total_time)))
-    logger.info("Training time: {}".format(total_time))
-    accelerator.end_training()
+    print("Training time: {}".format(total_time))
 
 
 if __name__ == '__main__':
