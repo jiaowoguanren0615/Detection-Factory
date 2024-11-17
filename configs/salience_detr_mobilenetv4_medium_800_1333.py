@@ -115,8 +115,8 @@ model = SalienceDETR(
 )
 
 
-# if __name__ == '__main__':
-#     from torchinfo import summary
-#     # print(backbone.num_channels)  ## [256, 256, 256, 256, 256]
-#     summary(model, input_size=(1, 3, 384, 384))  ## [1, 1536, 16, 16]
-#     print('==>Pass')
+if __name__ == '__main__':
+    from torchinfo import summary
+    # print(backbone.num_channels)  ## [256, 256, 256, 256, 256]
+    summary(model, input_size=(1, 3, 384, 384))  ##
+    print('==>Pass')
