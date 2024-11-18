@@ -236,7 +236,7 @@ def visualize_coco_bounding_boxes(
         dataset=dataset,
         show_dir=show_dir,
     )
-    [None for _ in tqdm(data_loader)]
+    # [None for _ in tqdm(data_loader)]
 
 
 def _visualize_batch_in_coco(
