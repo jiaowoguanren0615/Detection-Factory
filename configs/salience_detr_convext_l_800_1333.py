@@ -11,8 +11,9 @@ from models.bricks.salience_transformer import (
     SalienceTransformerEncoderLayer,
 )
 from util.set_criterion import HybridSetCriterion
-from models.detectors.salience_detr import SalienceCriterion, SalienceDETR
 from util.hungarian_matcher import HungarianMatcher
+
+from models.detectors.salience_detr import SalienceCriterion, SalienceDETR
 from models.necks.channel_mapper import ChannelMapper
 from models.necks.repnet import RepVGGPluXNetwork
 
@@ -109,8 +110,8 @@ model = SalienceDETR(
     max_size=1333,
 )
 
-if __name__ == '__main__':
-    from torchinfo import summary
-    print(backbone.num_channels)  ## [384, 768, 1536]
-    summary(model, input_size=(1, 3, 512, 512))  ## [1, 1536, 16, 16]
-    print('==>Pass')
+# if __name__ == '__main__':
+#     from torchinfo import summary
+#     print(backbone.num_channels)  ## [384, 768, 1536]
+#     summary(model, input_size=(1, 3, 512, 512))  ## [1, 1536, 16, 16]
+#     print('==>Pass')
