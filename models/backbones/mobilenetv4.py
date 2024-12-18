@@ -325,7 +325,7 @@ class MobileNetV4(nn.Module):
         third_channel = self.spec["layer3"]["block_specs"][-1][1]
         forth_channel = self.spec["layer4"]["block_specs"][-1][1]
         fifth_channel = self.spec["layer5"]["block_specs"][-1][1]
-        self.channels = [first_channel, second_channel, third_channel, forth_channel, fifth_channel]
+        self.channels = [first_channel, second_channel, third_channel, forth_channel]
 
         # conv0
         self.conv0 = build_blocks(self.spec["conv0"])
@@ -353,7 +353,7 @@ class MobileNetV4(nn.Module):
         # x5 = F.adaptive_avg_pool2d(x5, 1)
         # out = self.head(x5.flatten(1))
 
-        return [x1, x2, x3, x4, x5]
+        return [x1, x2, x3, x4]
         # return out
 
 
@@ -375,6 +375,7 @@ class DepthwiseSeparableConv(nn.Module):
         x = self.pointwise(x)
         x = self.bn(x)
         return self.activation(x)
+
 
 class FPN(nn.Module):
     def __init__(self, in_channels_list, out_channels=256):
@@ -438,7 +439,7 @@ class MobileNetV4BackBone(BaseBackbone):
             self,
             arch: str,
             weights: Dict = None,
-            return_indices: Tuple[int] = (0, 1, 2, 3, 4),
+            return_indices: Tuple[int] = (0, 1, 2, 3),
             **kwargs,
     ):
         # get parameters and instantiate backbone
@@ -464,12 +465,13 @@ class MobileNetV4BackBone(BaseBackbone):
 #     from torchinfo import summary
 #     img = torch.randn(1, 3, 384, 384)
 #     model = MobileNetV4('MobileNetV4ConvMedium')
-#     summary(model, input_size=(1, 3, 384, 384))
-    # y = model(img)
-    # for i in y:
-    #     print(i.size())
-    # # print(model.channels)
-    # fpn = FPN(in_channels_list=model.channels, out_channels=256)
-    # outputs = fpn([y[0], y[1], y[2], y[3], y[4]])
-    # for i in outputs:
-    #     print(i.size())
+#     # summary(model, input_size=(1, 3, 384, 384))
+#     y = model(img)
+#     for i in y:
+#         print(i.size())
+#     # # print(model.channels)
+#     fpn = FPN(in_channels_list=model.channels, out_channels=256)
+#     outputs = fpn([y[0], y[1], y[2], y[3]])
+#     # print(outputs)
+#     for key in outputs.keys():
+#         print(key, outputs[key].size())

@@ -21,7 +21,7 @@ from models.necks.repnet import RepVGGPluXNetwork
 embed_dim = 256
 num_classes = 91
 num_queries = 900
-num_feature_levels = 5
+num_feature_levels = 4
 transformer_enc_layers = 6
 transformer_dec_layers = 6
 num_heads = 8
@@ -75,7 +75,7 @@ transformer = SalienceTransformer(
     num_classes=num_classes,
     num_feature_levels=num_feature_levels,
     two_stage_num_proposals=num_queries,
-    level_filter_ratio=(0.4, 0.5, 0.8, 1.0, 1.0),
+    level_filter_ratio=(0.4, 0.5, 0.8, 1.0),
     layer_filter_ratio=(1.0, 0.8, 0.6, 0.6, 0.4, 0.2),
 )
 
@@ -115,8 +115,8 @@ model = SalienceDETR(
 )
 
 
-# if __name__ == '__main__':
-#     from torchinfo import summary
-#     # print(backbone.num_channels)  ## [256, 256, 256, 256, 256]
-#     summary(model, input_size=(1, 3, 384, 384))  ##
-#     print('==>Pass')
+if __name__ == '__main__':
+    from torchinfo import summary
+    print(backbone.num_channels)  ## [256, 256, 256, 256]
+    summary(model, input_size=(1, 3, 384, 384))  ##
+    print('==>Pass')
