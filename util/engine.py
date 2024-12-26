@@ -155,9 +155,9 @@ def evaluate(model, data_loader, device):
     metric_names += ["AR_1", "AR_10", "AR_100", "AR-s", "AR-m", "AR-l"]
     metric_dict = dict(zip(metric_names, coco_evaluator.coco_eval["bbox"].stats))
 
-    # coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
+    coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
 
-    return coco_evaluator
+    return coco_evaluator, coco_info
 
 
 def _get_iou_types(model):

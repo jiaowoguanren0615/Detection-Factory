@@ -15,7 +15,7 @@ from torch.utils import data
 from timm.utils import NativeScaler
 
 from datasets import build_dataset
-
+from pathlib import Path
 
 from util.collate_fn import collate_fn
 from util.engine import evaluate, train_one_epoch
@@ -34,8 +34,8 @@ def parse_args():
         default='fp16',
         choices=["no", "fp16", "bf16", "fp8"],
         help="Whether to use mixed precision. Choose"
-        "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
-        "and an Nvidia Ampere GPU.",
+             "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
+             "and an Nvidia Ampere GPU.",
     )
     parser.add_argument(
         "--accumulate-steps", type=int, default=1, help="Steps to accumulate gradients"
@@ -55,13 +55,14 @@ def parse_args():
         https://huggingface.co/docs/accelerate/main/en/package_reference/utilities#accelerate.utils.DynamoBackend
         """,
     )
+    parser.add_argument("--freeze_layers", default=True, type=bool)
+    parser.add_argument("--output_dir", default="./output")
 
     args = parser.parse_args()
     return args
 
 
-def train():
-    args = parse_args()
+def train(args):
     print(args)
     init_distributed_mode(args)
 
@@ -74,6 +75,8 @@ def train():
 
     cfg = Config(args.config_file, partials=("lr_scheduler", "optimizer", "param_dicts"))
     logger = logging.getLogger(os.path.basename(os.getcwd()) + "." + __name__)
+
+    results_file = "results{}.txt".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
     # modify output directory
     if getattr(cfg, "output_dir", None) is None:
@@ -100,7 +103,6 @@ def train():
                 datetime.datetime.now().strftime("%Y-%m-%d-%H_%M_%S"),
             )
 
-
     # instantiate dataset
     params = dict(num_workers=cfg.num_workers, collate_fn=collate_fn)
     params.update(dict(pin_memory=cfg.pin_memory, persistent_workers=True))
@@ -121,8 +123,16 @@ def train():
     # instantiate model, optimizer and lr_scheduler
     model = Config(cfg.model_path).model
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=1e-4, betas=(0.9, 0.999))
-    lr_scheduler = cfg.lr_scheduler(optimizer)
+    # register dataset class information into the model, useful for inference
+    cat_ids = list(range(max(cfg.train_dataset.coco.cats.keys()) + 1))
+    classes = tuple(cfg.train_dataset.coco.cats.get(c, {"name": "none"})["name"] for c in cat_ids)
+    model.register_buffer("_classes_", torch.tensor(encode_labels(classes)))
+
+    # TODO prepare for distributed training
+    model_without_ddp = model
+    if args.distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+        model_without_ddp = model.module
 
     # load from a pretrained weight and fine-tune on it
     weight_path = getattr(cfg, "resume_from_checkpoint", None)
@@ -131,13 +141,13 @@ def train():
         load_state_dict(model, checkpoint)
         logger.info(f"load pretrained from {cfg.resume_from_checkpoint}")
 
-    # register dataset class information into the model, useful for inference
-    cat_ids = list(range(max(cfg.train_dataset.coco.cats.keys()) + 1))
-    classes = tuple(cfg.train_dataset.coco.cats.get(c, {"name": "none"})["name"] for c in cat_ids)
-    model.register_buffer("_classes_", torch.tensor(encode_labels(classes)))
-
-    # TODO prepare for distributed training
-
+    if args.freeze_layers:
+        for name, para in model.transformer.decoder.named_parameters():
+            if 'class_head' not in name:
+                para.requires_grad_(False)
+            else:
+                para.requires_grad_(True)
+                print('training {}'.format(name))
 
     # load from a directory, which means resume training
     if weight_path is not None and os.path.isdir(weight_path):
@@ -148,11 +158,19 @@ def train():
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         logger.info("model parameters: {}".format(n_params))
 
+    model = model.to(cfg.device)
 
+    optimizer = torch.optim.AdamW(model_without_ddp.parameters(), lr=cfg.learning_rate, weight_decay=1e-4,
+                                  betas=(0.9, 0.999))
+    lr_scheduler = cfg.lr_scheduler(optimizer)
     loss_scalar = NativeScaler()
+
     start_time = time.perf_counter()
+
+    best_map = 0.0
+
     for epoch in range(cfg.starting_epoch, cfg.num_epochs):
-        train_one_epoch(
+        mloss, now_lr = train_one_epoch(
             model=model,
             optimizer=optimizer,
             data_loader=train_loader,
@@ -165,10 +183,35 @@ def train():
             loss_scaler=loss_scalar
         )
 
-        coco_evaluator = evaluate(model, test_loader, epoch)
+        coco_evaluator, result_info = evaluate(model, test_loader, epoch)
 
         # save best results
         cur_ap, cur_ap50 = coco_evaluator.coco_eval["bbox"].stats[:2]
+        coco_mAP = result_info[0]
+        voc_mAP = result_info[1]
+        coco_mAR = result_info[8]
+        print(f'@Evaluate metrics in coco_mAP is {coco_mAP}.')
+        print(f'@Evaluate metrics in voc_mAP is {voc_mAP}.')
+        print(f'@Evaluate metrics in coco_mAR is {coco_mAR}.')
+
+        # write into txt
+        with open(results_file, "a") as f:
+            result_info = [str(round(i, 4)) for i in result_info + [mloss.tolist()[-1]]] + [str(round(lr, 6))]
+            txt = "epoch:{} {}".format(epoch, '  '.join(result_info))
+            f.write(txt + "\n")
+
+        # update best mAP(IoU=0.50:0.95)
+        if cur_ap50 > best_map:
+            best_map = cur_ap50
+            save_on_master({
+                'model': model_without_ddp.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'lr_scheduler': lr_scheduler.state_dict(),
+                'args': args,
+                'epoch': epoch,
+                'best_map': best_map,
+                'scalar': loss_scalar.state_dict()},
+                os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
 
     total_time = time.perf_counter() - start_time
     total_time = str(datetime.timedelta(seconds=int(total_time)))
@@ -176,4 +219,7 @@ def train():
 
 
 if __name__ == '__main__':
-    train()
+    args = parse_args()
+    if args.output_dir:
+        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    train(args)
