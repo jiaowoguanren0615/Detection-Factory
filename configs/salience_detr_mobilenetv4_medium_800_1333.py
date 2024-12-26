@@ -22,15 +22,15 @@ embed_dim = 256
 num_classes = 91
 num_queries = 900
 num_feature_levels = 4
-transformer_enc_layers = 6
-transformer_dec_layers = 6
+transformer_enc_layers = 4
+transformer_dec_layers = 4
 num_heads = 8
-dim_feedforward = 2048
+dim_feedforward = 1024
 
 # instantiate model components
 position_embedding = PositionEmbeddingSine(embed_dim // 2, temperature=10000, normalize=True, offset=-0.5)
 
-backbone = MobileNetV4BackBone("mobilenetv4_medium")
+backbone = MobileNetV4BackBone("mobilenetv4_small")
 
 
 neck = ChannelMapper(
@@ -115,8 +115,7 @@ model = SalienceDETR(
 )
 
 
-if __name__ == '__main__':
-    from torchinfo import summary
-    print(backbone.num_channels)  ## [256, 256, 256, 256]
-    summary(model, input_size=(1, 3, 384, 384))  ##
-    print('==>Pass')
+# if __name__ == '__main__':
+#     from torchinfo import summary
+#     print(backbone.num_channels)  ## [256, 256, 256, 256]
+#     summary(model, input_size=(1, 3, 800, 800))  ##

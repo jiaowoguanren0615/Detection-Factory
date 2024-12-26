@@ -341,9 +341,9 @@ MNV4HybridConvLarge_BLOCK_SPECS = {
 }
 
 MODEL_SPECS = {
-    "MobileNetV4ConvSmall": MNV4ConvSmall_BLOCK_SPECS,
-    "MobileNetV4ConvMedium": MNV4ConvMedium_BLOCK_SPECS,
-    "MobileNetV4ConvLarge": MNV4ConvLarge_BLOCK_SPECS,
-    "MobileNetV4HybridMedium": MNV4HybridConvMedium_BLOCK_SPECS,
-    "MobileNetV4HybridLarge": MNV4HybridConvLarge_BLOCK_SPECS
+    "mobilenetv4_small": MNV4ConvSmall_BLOCK_SPECS,
+    "mobilenetv4_medium": MNV4ConvMedium_BLOCK_SPECS,
+    "mobilenetv4_large": MNV4ConvLarge_BLOCK_SPECS,
+    "mobilenetv4_hybrid_medium": MNV4HybridConvMedium_BLOCK_SPECS,
+    "mobilenetv4_hybrid_large": MNV4HybridConvLarge_BLOCK_SPECS
 }

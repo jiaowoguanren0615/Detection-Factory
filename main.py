@@ -22,7 +22,7 @@ from util.engine import evaluate, train_one_epoch
 from util.group_by_aspect_ratio import GroupedBatchSampler, create_aspect_ratio_groups
 from util.lazy_load import Config
 from util.misc import encode_labels, fixed_generator, seed_worker
-from util.distributed_utils import load_checkpoint, load_state_dict, init_distributed_mode, get_rank
+from util.distributed_utils import load_checkpoint, load_state_dict, init_distributed_mode, get_rank, save_on_master
 
 
 def parse_args():
@@ -31,7 +31,7 @@ def parse_args():
     parser.add_argument(
         "--mixed-precision",
         type=str,
-        default=None,
+        default='fp16',
         choices=["no", "fp16", "bf16", "fp8"],
         help="Whether to use mixed precision. Choose"
         "between fp16 and bf16 (bfloat16). Bf16 requires PyTorch >= 1.10."
