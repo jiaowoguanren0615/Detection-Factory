@@ -7,3 +7,4 @@ from .metaformer import *
 from .mobilenetv4_blocks import *
 from .mobilenetv4_utils import *
 from .mobilenetv4_config import *
+from .focalnet import *

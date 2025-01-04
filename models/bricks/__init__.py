@@ -5,4 +5,6 @@ from .basic import *
 from .ms_deform_attn import *
 from .position_encoding import *
 from .post_process import *
+from .relation_transformer import *
 from .salience_transformer import *
+from .dino_transformer import *

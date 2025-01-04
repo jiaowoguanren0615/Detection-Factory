@@ -7,6 +7,8 @@ from models.bricks.denoising import GenerateCDNQueries
 from models.detectors.base import DNDETRDetector
 
 
+from torch import nn
+
 class RelationDETR(DNDETRDetector):
     def __init__(
         # model structure

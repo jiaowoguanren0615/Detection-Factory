@@ -33,7 +33,7 @@ train_dataset = CocoDetection("/mnt/d/CoCoStuff2017", dataset="train", transform
 test_dataset = CocoDetection("/mnt/d/CoCoStuff2017", dataset="val", transforms=data_transform['val'])
 
 # model config to train
-model_path = "configs/salience_detr/salience_detr_mobilenetv4_medium_800_1333.py"
+model_path = "configs/salience_detr_mobilenetv4_medium_800_1333.py"
 
 # specify a checkpoint folder to resume, or a pretrained ".pth" to finetune, for example:
 # checkpoints/salience_detr_resnet50_800_1333/train/2024-03-22-09_38_50
