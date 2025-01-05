@@ -114,7 +114,7 @@ model = SalienceDETR(
 #     print(backbone.num_channels)  ## [96, 192, 384, 576]
 #     summary(model, input_size=(1, 3, 800, 800))  ##
 #
-#
+#D
 #     print(model.transformer.decoder.class_head)
 #     """
 #     ModuleList(

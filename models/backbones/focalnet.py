@@ -9,10 +9,10 @@ from torch.nn.init import trunc_normal_
 from torchvision.models.feature_extraction import create_feature_extractor
 from torchvision.ops import StochasticDepth
 
-from models.backbones.base_backbone import BaseBackbone
+from models.backbones.base import BaseBackbone
 from util.lazy_load import LazyCall as L
 from util.lazy_load import instantiate
-from util.utils import load_checkpoint
+from util.distributed_utils import load_checkpoint
 
 
 class Mlp(nn.Module):
