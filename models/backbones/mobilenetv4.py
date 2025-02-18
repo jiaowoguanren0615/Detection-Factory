@@ -1020,7 +1020,7 @@ class MobileNetV4BackBone(BaseBackbone):
 
 
 # if __name__ == '__main__':
-    from torchinfo import summary
+#     from torchinfo import summary
     # img = torch.randn(1, 3, 384, 384)
     # model = MobileNetV4BackBone('mobilenetv4_large')
     # summary(model, input_size=(1, 3, 384, 384))
